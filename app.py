@@ -34,26 +34,34 @@ def check_website(url):
         end_time = time.time()
         response_time = round((end_time - start_time) * 1000, 2)  # Convert to milliseconds
         
-        website = Website.query.filter_by(url=url).first()
-        if website:
-            website.last_checked = datetime.now()
-            website.status = 'up' if response.status_code == 200 else 'down'
-            website.response_time = response_time
-            db.session.commit()
-    except:
-        website = Website.query.filter_by(url=url).first()
-        if website:
-            website.last_checked = datetime.now()
-            website.status = 'down'
-            website.response_time = None
-            db.session.commit()
+        with app.app_context():
+            website = Website.query.filter_by(url=url).first()
+            if website:
+                website.last_checked = datetime.now()
+                website.status = 'up' if response.status_code == 200 else 'down'
+                website.response_time = response_time
+                db.session.commit()
+    except Exception as e:
+        print(f"Error checking {url}: {str(e)}")
+        with app.app_context():
+            website = Website.query.filter_by(url=url).first()
+            if website:
+                website.last_checked = datetime.now()
+                website.status = 'down'
+                website.response_time = None
+                db.session.commit()
 
 def monitor_websites():
     while True:
-        websites = Website.query.all()
-        for website in websites:
-            check_website(website.url)
-        time.sleep(60)  # Check every minute
+        try:
+            with app.app_context():
+                websites = Website.query.all()
+                for website in websites:
+                    check_website(website.url)
+            time.sleep(60)  # Check every minute
+        except Exception as e:
+            print(f"Error in monitoring thread: {str(e)}")
+            time.sleep(60)  # Wait before retrying
 
 @app.route('/')
 def home():
@@ -95,11 +103,23 @@ def update_name(id):
     db.session.commit()
     return jsonify({'status': 'success'})
 
+@app.route('/get_websites', methods=['GET'])
+def get_websites():
+    websites = Website.query.all()
+    websites_data = []
+    for website in websites:
+        websites_data.append({
+            'id': website.id,
+            'name': website.name,
+            'url': website.url,
+            'status': website.status,
+            'last_checked': website.last_checked.strftime('%Y-%m-%d %H:%M:%S') if website.last_checked else 'Never',
+            'response_time': website.response_time
+        })
+    return jsonify(websites_data)
+
 if __name__ == '__main__':
     with app.app_context():
-        # Drop all existing tables
-        db.drop_all()
-        # Create all tables with the new schema
         db.create_all()
         # Start the monitoring thread
         monitor_thread = threading.Thread(target=monitor_websites, daemon=True)

@@ -90,14 +90,25 @@
         .status-up {
             color: #4EC9B0;
             font-weight: 600;
+            transition: color 0.3s ease;
         }
         .status-down {
             color: #f14c4c;
             font-weight: 600;
+            transition: color 0.3s ease;
         }
         .status-pending {
             color: #CCA700;
             font-weight: 600;
+            transition: color 0.3s ease;
+        }
+        .status-updating {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
         .delete-btn {
             background-color: #f14c4c;
@@ -143,9 +154,9 @@
                     <th>Action</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="websites-table-body">
                 {% for website in websites %}
-                <tr>
+                <tr data-id="{{ website.id }}">
                     <td>
                         <span class="editable-name" 
                               data-id="{{ website.id }}"
@@ -167,6 +178,47 @@
     </div>
 
     <script>
+        function updateTable(websites) {
+            const tbody = document.getElementById('websites-table-body');
+            tbody.innerHTML = '';
+            
+            websites.forEach(website => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-id', website.id);
+                
+                row.innerHTML = `
+                    <td>
+                        <span class="editable-name" 
+                              data-id="${website.id}"
+                              onclick="editName(this)"
+                              onblur="saveName(this)"
+                              contenteditable="true">${website.name}</span>
+                    </td>
+                    <td>${website.url}</td>
+                    <td class="status-${website.status}">${website.status.charAt(0).toUpperCase() + website.status.slice(1)}</td>
+                    <td>${website.last_checked}</td>
+                    <td>${website.response_time}ms</td>
+                    <td>
+                        <button class="delete-btn" onclick="deleteWebsite(${website.id})">Delete</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function fetchWebsites() {
+            fetch('/get_websites')
+                .then(response => response.json())
+                .then(websites => {
+                    updateTable(websites);
+                })
+                .catch(error => console.error('Error fetching websites:', error));
+        }
+
+        // Update every 60 seconds (1 minute)
+        setInterval(fetchWebsites, 60000);
+
         function addWebsite() {
             const url = document.getElementById('website-url').value;
             if (!url) return;
@@ -181,7 +233,8 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    location.reload();
+                    document.getElementById('website-url').value = '';
+                    fetchWebsites();
                 }
             });
         }
@@ -193,7 +246,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    location.reload();
+                    fetchWebsites();
                 }
             });
         }
@@ -218,11 +271,13 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status !== 'success') {
-                    // Revert the change if the server update failed
-                    location.reload();
+                    fetchWebsites();
                 }
             });
         }
+
+        // Initial fetch
+        fetchWebsites();
     </script>
 </body>
 </html> 
