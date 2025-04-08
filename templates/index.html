@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Uptime Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .add-website {
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .website-list {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .website-list th, .website-list td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .website-list th {
+            background-color: #f8f9fa;
+        }
+        .status-up {
+            color: #4CAF50;
+        }
+        .status-down {
+            color: #f44336;
+        }
+        .status-pending {
+            color: #ff9800;
+        }
+        .delete-btn {
+            background-color: #f44336;
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+        .delete-btn:hover {
+            background-color: #d32f2f;
+        }
+        .editable-name {
+            cursor: pointer;
+            padding: 5px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+        .editable-name:hover {
+            background-color: #f5f5f5;
+        }
+        .editable-name.editing {
+            border: 1px solid #ddd;
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Website Uptime Monitor</h1>
+        
+        <div class="add-website">
+            <input type="text" id="website-url" placeholder="Enter website URL (e.g., example.com)">
+            <button onclick="addWebsite()">Add Website</button>
+        </div>
+
+        <table class="website-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>URL</th>
+                    <th>Status</th>
+                    <th>Last Checked</th>
+                    <th>Response Time</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for website in websites %}
+                <tr>
+                    <td>
+                        <span class="editable-name" 
+                              data-id="{{ website.id }}"
+                              onclick="editName(this)"
+                              onblur="saveName(this)"
+                              contenteditable="true">{{ website.name }}</span>
+                    </td>
+                    <td>{{ website.url }}</td>
+                    <td class="status-{{ website.status }}">{{ website.status|title }}</td>
+                    <td>{{ website.last_checked.strftime('%Y-%m-%d %H:%M:%S') if website.last_checked else 'Never' }}</td>
+                    <td>{{ website.response_time }}ms</td>
+                    <td>
+                        <button class="delete-btn" onclick="deleteWebsite({{ website.id }})">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function addWebsite() {
+            const url = document.getElementById('website-url').value;
+            if (!url) return;
+
+            fetch('/add_website', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `url=${encodeURIComponent(url)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                }
+            });
+        }
+
+        function deleteWebsite(id) {
+            fetch(`/delete_website/${id}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                }
+            });
+        }
+
+        function editName(element) {
+            element.classList.add('editing');
+            element.focus();
+        }
+
+        function saveName(element) {
+            element.classList.remove('editing');
+            const id = element.getAttribute('data-id');
+            const newName = element.textContent.trim();
+
+            fetch(`/update_name/${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `name=${encodeURIComponent(newName)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    // Revert the change if the server update failed
+                    location.reload();
+                }
+            });
+        }
+    </script>
+</body>
+</html> 
